@@ -1,11 +1,11 @@
 # Generated from the official TinyTapeout SKY130 template, yaml_version unchanged.
 project:
-  title: "ADC3542 DDR receiver"
+  title: "ADC3543 DDR receiver"
   author: "BarryLee911"
   discord: ""
   description: "Native seven-wire DDR reception, full 14-bit rectified accumulation and overlap count"
   language: "Verilog"
-  clock_hz: 40960000
+  clock_hz: 80000000
   tiles: "6x2"
   top_module: "tt_um_barrylee911_adc3542_ddr"
   source_files:

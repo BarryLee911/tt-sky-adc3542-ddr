@@ -38,6 +38,9 @@ jobs:
         uses: TinyTapeout/tt-gds-action/gl_test@ttsky26d
 
   viewer:
+    # Deploy the public viewer only from main; feature branches still build GDS,
+    # run precheck and exercise the generated gate-level netlist.
+    if: github.ref == 'refs/heads/main'
     needs: gds
     runs-on: ubuntu-24.04
     permissions:

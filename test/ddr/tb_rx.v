@@ -7,7 +7,7 @@ module tb_rx;
  integer checks=0, samples=0, errors=0, i,q,raw;
  adc3542_rx7 #(.INPUT_TWOS_COMPLEMENT(0)) a(clk,rst_n,data,mark,ob,ov,oe,ol);
  adc3542_rx7 #(.INPUT_TWOS_COMPLEMENT(1)) b(clk,rst_n,data,mark,tc,tv,te,tl);
- always #12.207 clk=~clk;
+ always #6.25 clk=~clk;
  task tick(input integer m,d,r,v,e,x);
  begin
    @(negedge clk);mark=m;data=d;rst_n=r;
@@ -36,5 +36,5 @@ module tb_rx;
    $display("RX_PASS,checks=%0d,samples=%0d,detected_errors=%0d,whole_pair_loss_undetectable=1",checks,samples,errors);
    $finish;
  end
- initial begin #10000000;$fatal(1,"RX timeout");end
+ initial begin #5000000;$fatal(1,"RX timeout");end
 endmodule

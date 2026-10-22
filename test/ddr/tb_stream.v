@@ -4,6 +4,8 @@
 module tb_stream;
  parameter integer HANDOFF=80000;
  parameter integer TWOS=1;
+ parameter integer LEVEL=1;
+ localparam integer STRIDE=1<<(LEVEL-1);
  reg clk=0,rst_n=0,controller_drives=1;
  reg [7:0] ui=0;
  reg [4:0] config_bus=31;
@@ -17,11 +19,16 @@ module tb_stream;
  .ui_in(ui),.uo_out(outp),.uio_in(inp),.uio_out(iop),.uio_oe(oep),.ena(1'b1),.clk(clk),.rst_n(rst_n));
  tt_um_sine_area_detector_12bit #(.HANDOFF_WAIT_CYCLES(HANDOFF)) old(
  .ui_in(ui),.uo_out(oldout),.uio_in(inp),.uio_out(oldio),.uio_oe(oldoe),.ena(1'b1),.clk(clk),.rst_n(rst_n));
- always #12.207 clk=~clk;
+ always #6.25 clk=~clk;
  reg [7:0] bytes[0:4194303];
  integer ev=0,ee=0,eq=8192,pv=0,pe=0,pq=8192,configured=0;
  wire ref_reset = rst_n && configured && !pe;
- wire ref_valid = pv && ref_reset;
+ reg [21:0] ref_phase=0;
+ wire ref_valid = pv && ref_reset && (ref_phase==STRIDE-1);
+ always @(posedge clk)begin
+   if(!ref_reset)ref_phase<=0;
+   else if(pv)ref_phase <= (ref_phase==STRIDE-1) ? 0 : ref_phase+1;
+ end
  wire [13:0] ref_sample=pq;
  wire [24:0] ref_sum;
  wire [28:0] ref_sum16;
@@ -37,6 +44,7 @@ module tb_stream;
  integer edges=0,accepted=0,count_checks=0,frames=0,invalids=0,updates_open=0,error_count=0,resets=0;
  integer max_sum16=0,remainder_mask=0,signbit,agree,mag,j,tag,payload,expect_handoff=0,config_age=0;
  integer n,fd,got,faults=0,idx,q,raw,boot;
+ integer raw_since_reset=0,selected_since_reset=0;
  string input_file;
  task tick(input integer bus,v,e,x,r);
  begin
@@ -53,9 +61,12 @@ module tb_stream;
    edges=edges+1;
    count_before=count;latest_before=latest;ready_before=ready;
    run_before=rst_n && configured && !pe;
+   if(dut.backend_process !== (run_before && pv && ((raw_since_reset+1)%STRIDE==0)))
+     $fatal(1,"Independent sample selection level=%0d edge=%0d",LEVEL,edges);
    expect_bv=0;expect_sv=0;
    if(!run_before) begin
      pos=0;count=0;bpos=0;bsum=0;blocks=0;rpos=0;s16=0;latest=0;ready=0;prev_sv=0;
+     raw_since_reset=0;selected_since_reset=0;
      part=0;frame_open=0;
      for(j=0;j<2048;j=j+1)hist[j]=0;
      for(j=0;j<16;j=j+1)ring[j]=0;
@@ -65,6 +76,9 @@ module tb_stream;
        if(frame_open)updates_open=updates_open+1;
      end
      if(pv) begin
+       raw_since_reset=raw_since_reset+1;
+       if(raw_since_reset%STRIDE==0)begin
+       selected_since_reset=selected_since_reset+1;
        agree=((pq>=8192)==(pos>=1024));
        count=count+agree-hist[pos];hist[pos]=agree;pos=(pos+1)%2048;
        mag=pq>=8192 ? pq-8192:8192-pq;
@@ -79,11 +93,12 @@ module tb_stream;
            remainder_mask=remainder_mask | (1<<(s16%4));
          end
        end
+       end
      end
      prev_sv=expect_sv;prev_s16=s16;
    end
    if(!rst_n)begin configured=0;config_age=0;expect_handoff=0;end
-   else if(!configured && config_bus==1) begin configured=1;config_age=0;end
+   else if(!configured && config_bus==LEVEL) begin configured=1;config_age=0;end
    else if(configured) begin
      config_age=config_age+1;
      if(config_age==HANDOFF)expect_handoff=1;
@@ -131,7 +146,7 @@ module tb_stream;
    if(got!=2*n || n>2097152)$fatal(1,"Input length");
    repeat(4)tick(0,0,0,0,0);
    repeat(5)tick(0,0,0,0,1); // illegal configuration 31
-   @(negedge clk);config_bus=1;
+   @(negedge clk);config_bus=LEVEL;
    tick(0,0,0,0,1); // latch LEVEL, receiver still reset on this edge
    // First receiver-enabled tick above starts in upper half and is discarded.
    for(idx=0;idx<n;idx=idx+1)begin
@@ -148,7 +163,7 @@ module tb_stream;
        raw=q^(TWOS ? 8192:0);
        tick(128|(raw&127),0,0,0,1);
        repeat(3)tick(0,0,0,0,0);
-       @(negedge clk);controller_drives=1;config_bus=1;
+       @(negedge clk);controller_drives=1;config_bus=LEVEL;
        tick(0,0,0,0,1);
        tick(raw>>7,0,0,0,1); // reset interrupts half: stale lower cannot survive
        resets=resets+1;
@@ -157,8 +172,8 @@ module tb_stream;
    // Flush pipeline with four benign complete samples.
    repeat(4)pair(8192);
    if(frames<1 || count_checks<100 || (faults && (error_count!=2 || resets!=1 || invalids<1)))$fatal(1,"Coverage");
-   $display("STREAM_PASS,edges=%0d,accepted=%0d,count_checks=%0d,frames=%0d,invalids=%0d,updates_open=%0d,errors=%0d,resets=%0d,max_sum16=%0d,remainder_mask=%0d",edges,accepted,count_checks,frames,invalids,updates_open,error_count,resets,max_sum16,remainder_mask);
+   $display("STREAM_PASS,level=%0d,edges=%0d,accepted=%0d,count_checks=%0d,frames=%0d,invalids=%0d,updates_open=%0d,errors=%0d,resets=%0d,max_sum16=%0d,remainder_mask=%0d",LEVEL,edges,accepted,count_checks,frames,invalids,updates_open,error_count,resets,max_sum16,remainder_mask);
    $finish;
  end
- initial begin #150000000;$fatal(1,"Stream timeout");end
+ initial begin #75000000;$fatal(1,"Stream timeout");end
 endmodule

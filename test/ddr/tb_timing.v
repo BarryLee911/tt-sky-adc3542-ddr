@@ -2,13 +2,13 @@
 // Source-synchronous behavioural model: DCLK/data launched around the SAME edges.
 // Aperture guard reports violations even when lucky data values decode correctly.
 module tb_timing;
- localparam real H=24.4140625;
+ localparam real H=12.5;
  reg clk=0,rst_n=0,mark=0;
  reg [6:0] data=0;
  wire [13:0] sample14;
  wire valid,err,locked;
  adc3542_rx7 rx(clk,rst_n,data,mark,sample14,valid,err,locked);
- real phase=16,tpd=5,extra=0,skew=0,duty=0;
+ real phase=11.5,tpd=5,extra=0,skew=0,duty=0;
  real last_m=-1000,last_d=-1000,next_m,next_d,now_t,min_setup=1000,min_hold=1000,sm,hm;
  integer mi=-1,di=-1,k,d,m,capture,idx,previous=-1,checks=0,bad=0,aperture=0;
  function integer code(input integer n);
