@@ -1,0 +1,13 @@
+{
+  "template": "TinyTapeout/ttsky-verilog-template",
+  "template_commit": "a42e6662fab316e93b4e26399e21d41664a460b7",
+  "official_gds_action": "TinyTapeout/tt-gds-action@ttsky26d",
+  "preserved_sources": {
+    "adc3542_rx7.v": "20d7ac2265bb31bb6979972b35995faf0ac55567b2b24545d4aa160e0e36e14d",
+    "project_adc3542_ddr.v": "6311b2a7e2549ce5355c334f1a6534af17eeddf426625637fa1125ddbf2f8619",
+    "meanabs_candidate.v": "41db477363224763b4ed180d3de584f9fff50554051286889c100f782c0ad21f"
+  },
+  "clock_target_hz": 40960000,
+  "tiles": "6x2",
+  "physical_interface_signoff": "Not established; default TT I/O constraints are not the external DDR board budget"
+}

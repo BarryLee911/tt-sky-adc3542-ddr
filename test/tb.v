@@ -9,7 +9,7 @@ module tb ();
   // Dump the signals to a FST file. You can view it with gtkwave or surfer.
   initial begin
     $dumpfile("tb.fst");
-    $dumpvars(0, tb);
+    $dumpvars(1, tb);
     #1;
   end
 
@@ -27,8 +27,8 @@ module tb ();
   wire VGND = 1'b0;
 `endif
 
-  // Replace tt_um_example with your module name:
-  tt_um_example user_project (
+  // Replace tt_um_barrylee911_adc3542_ddr with your module name:
+  tt_um_barrylee911_adc3542_ddr user_project (
 
       // Include power ports for the Gate Level test:
 `ifdef GL_TEST

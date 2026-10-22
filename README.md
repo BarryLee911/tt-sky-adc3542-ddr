@@ -1,42 +1,59 @@
-![](../../workflows/gds/badge.svg) ![](../../workflows/docs/badge.svg) ![](../../workflows/test/badge.svg) ![](../../workflows/fpga/badge.svg)
+# ADC3542 native DDR receiver for TinyTapeout SKY130
 
-# Tiny Tapeout Verilog Project Template
+[![gds](https://github.com/BarryLee911/tt-sky-adc3542-ddr/actions/workflows/gds.yaml/badge.svg)](https://github.com/BarryLee911/tt-sky-adc3542-ddr/actions/workflows/gds.yaml)
+[![test](https://github.com/BarryLee911/tt-sky-adc3542-ddr/actions/workflows/test.yaml/badge.svg)](https://github.com/BarryLee911/tt-sky-adc3542-ddr/actions/workflows/test.yaml)
+[![ddr-regression](https://github.com/BarryLee911/tt-sky-adc3542-ddr/actions/workflows/ddr-regression.yaml/badge.svg)](https://github.com/BarryLee911/tt-sky-adc3542-ddr/actions/workflows/ddr-regression.yaml)
+[![docs](https://github.com/BarryLee911/tt-sky-adc3542-ddr/actions/workflows/docs.yaml/badge.svg)](https://github.com/BarryLee911/tt-sky-adc3542-ddr/actions/workflows/docs.yaml)
 
-- [Read the documentation for project](docs/info.md)
+Created using the official [TinyTapeout SKY130 Verilog template](https://github.com/TinyTapeout/ttsky-verilog-template).
+The official GDS, precheck, gate-level test and documentation workflows are retained.
+Target: **6x2 tiles, 40.96MHz core clock, 20.48MS/s ADC, LEVEL=1 only**.
 
-## What is Tiny Tapeout?
+Seven data pads plus DCLK reconstruct every full 14-bit ADC word inside the ASIC.
+The previous COUNT algorithm and three-fragment 27-bit output protocol are retained.
+The 29-bit moving sum is divided by four only after full 14-bit accumulation.
+Default ADC input format is two's complement; no external FPGA data bridge is required.
 
-Tiny Tapeout is an educational project that aims to make it easier and cheaper than ever to get your digital and analog designs manufactured on a real chip.
+本仓库从官方模板创建并公开。原8位、12位原型和上一轮本地交付均保留；新仓库仅增加
+平台顶层封装、便携测试与官方构建配置。40.96MHz是构建目标，实际ADC/电平转换/PCB
+采样相位仍需独立签核，不能用流程绿灯或频率比代替接口时序保证。
 
-To learn more and get started, visit https://tinytapeout.com.
+- [Project datasheet / pin protocol](docs/info.md)
+- [Wiring, initialization and timing assumptions](docs/interface-and-timing.md)
+- [Original local functional evidence](docs/local-validation-summary.json)
+- [Template and preserved-source provenance](build_provenance.json)
 
-## Set up your Verilog project
+## Tests
 
-1. Add your Verilog files to the `src` folder.
-2. Edit the [info.yaml](info.yaml) and update information about your project, paying special attention to the `source_files` and `top_module` properties. If you are upgrading an existing Tiny Tapeout project, check out our [online info.yaml migration tool](https://tinytapeout.github.io/tt-yaml-upgrade-tool/).
-3. Edit [docs/info.md](docs/info.md) and add a description of your project.
-4. Adapt the testbench to your design. See [test/README.md](test/README.md) for more information.
+The official `test` and `gl_test` jobs run the same pin-level cocotb test, including
+full-scale 27-bit output, midpoint input, TYPE/OE handoff, framing-error invalidation
+and reset. Gate-level functional simulation deliberately uses a slow settling clock.
 
-The GitHub action will automatically build the ASIC files using [LibreLane](https://www.zerotoasiccourse.com/terminology/librelane/).
+The additional full regression checks exhaustive bit order, random/boundary codes,
+both code formats, independent integer COUNT and sums, frame atomicity, recovery,
+and 3969 source-synchronous timing-model combinations. A reviewable artificial
+stimulus generator recreates byte-identical prior clean and combined-interference
+codes, checked against hashes in test/fixtures/manifest.json. No opaque fixture
+archives or measured participant data are published. These are arithmetic tests, not
+new ADC noise, physiological-time or human impedance performance measurements.
 
-## Enable GitHub actions to build the results page
+With Python 3.12+ and Icarus installed:
 
-- [Enabling GitHub Pages](https://tinytapeout.com/faq/#my-github-action-is-failing-on-the-pages-part)
+```
+pip install -r tools/requirements.txt
+python tools/run_tests.py prepare
+python tools/run_tests.py compile
+python tools/run_tests.py run
+python tools/timing_sweep.py compile
+python tools/timing_sweep.py run
+python tools/host_protocol.py
+```
 
-## Resources
+For the official cocotb harness, install test/requirements.txt, then run `make` in
+test/ and verify results.xml with `python -m cocotb_tools.check_results results.xml`.
+New logs/reports live in ignored build/ and GitHub Actions artifacts. No original
+workspace paths, credentials, paper sources, vendor PDFs or raw study data are needed.
 
-- [FAQ](https://tinytapeout.com/faq/)
-- [Digital design lessons](https://tinytapeout.com/digital_design/)
-- [Learn how semiconductors work](https://tinytapeout.com/siliwiz/)
-- [Join the community](https://tinytapeout.com/discord)
-- [Build your design locally](https://www.tinytapeout.com/guides/local-hardening/)
-
-## What next?
-
-- [Submit your design to the next shuttle](https://app.tinytapeout.com/).
-- Edit [this README](README.md) and explain your design, how it works, and how to test it.
-- Share your project on your social network of choice:
-  - LinkedIn [#tinytapeout](https://www.linkedin.com/search/results/content/?keywords=%23tinytapeout) [@TinyTapeout](https://www.linkedin.com/company/100708654/)
-  - Mastodon [#tinytapeout](https://chaos.social/tags/tinytapeout) [@matthewvenn](https://chaos.social/@matthewvenn)
-  - X (formerly Twitter) [#tinytapeout](https://twitter.com/hashtag/tinytapeout) [@tinytapeout](https://twitter.com/tinytapeout)
-  - Bluesky [@tinytapeout.com](https://bsky.app/profile/tinytapeout.com)
+The ASIC flow uses the official template's standard I/O assumptions; even a successful
+GDS build does not sign off the external ADC DDR aperture. Read timing reports and
+the documented physical limitations before making any high-speed hardware claim.
