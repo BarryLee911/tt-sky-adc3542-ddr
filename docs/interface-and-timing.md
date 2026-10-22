@@ -57,9 +57,19 @@ Real signoff requires cell libraries, pad/slew limits, clocks after CTS, board
 and translator min/max PVT delays, ADC output duty bounds and setup AND hold.
 
 If an upper half is captured on edge C, sample_valid is registered after C;
-COUNT and accumulation process it at C+1. A completed 16-period result reaches
+the decimator considers it at C+1. Only every D=2^(LEVEL-1)th complete word
+advances COUNT and accumulation. Since reset/reacquisition, raw zero-based
+indices D-1, 2D-1, 3D-1, ... are selected. LEVEL1 selects all complete words.
+A completed 16-period result reaches
 the latest register at C+2 and can enter a new tag0 snapshot at C+3 or later.
-Sample n starts from the first accepted pair; its COUNT reference is
+Selected-sample index n starts from the first selected word; its COUNT reference is
 floor((n mod 2048)/1024). ADC conversion latency and release phase still require
 calibration against the physical excitation reference. Equal clock frequencies
 alone do not establish absolute phase or error-free 40.96MHz operation.
+
+Changing LEVEL does not slow the physical DDR receiver or the ADC clock. The
+ADC must still emit one half-word per clk; slowing DCLK without changing the
+receiver architecture is a framing error, even at a higher LEVEL. Input timing
+budgets above therefore apply to every mode. Effective rates, first-result
+latency, reference frequency, reset-only reconfiguration and aliasing limits
+are documented in [multi-level behavior](multilevel.md).

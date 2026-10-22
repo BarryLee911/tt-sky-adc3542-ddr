@@ -7,12 +7,17 @@
 
 Created using the official [TinyTapeout SKY130 Verilog template](https://github.com/TinyTapeout/ttsky-verilog-template).
 The official GDS, precheck, gate-level test and documentation workflows are retained.
-Target: **6x2 tiles, 40.96MHz core clock, 20.48MS/s ADC, LEVEL=1 only**.
+Target: **6x2 tiles, 40.96MHz core clock, 20.48MS/s ADC, LEVEL=1..23**.
 
 Seven data pads plus DCLK reconstruct every full 14-bit ADC word inside the ASIC.
 The previous COUNT algorithm and three-fragment 27-bit output protocol are retained.
 The 29-bit moving sum is divided by four only after full 14-bit accumulation.
 Default ADC input format is two's complement; no external FPGA data bridge is required.
+
+LEVEL controls processing after complete-word assembly. For LEVEL=L, select every
+2^(L-1)th ADC word: the effective rate is clk/2^L. The ADC stream and receiver
+remain at full rate in every mode. LEVEL0 and LEVEL24..31 are rejected. See
+[multi-level behavior and validation](docs/multilevel.md) before changing modes.
 
 本仓库从官方模板创建并公开。原8位、12位原型和上一轮本地交付均保留；新仓库仅增加
 平台顶层封装、便携测试与官方构建配置。40.96MHz是构建目标，实际ADC/电平转换/PCB
@@ -29,7 +34,9 @@ The official `test` and `gl_test` jobs run the same pin-level cocotb test, inclu
 full-scale 27-bit output, midpoint input, TYPE/OE handoff, framing-error invalidation
 and reset. Gate-level functional simulation deliberately uses a slow settling clock.
 
-The additional full regression checks exhaustive bit order, random/boundary codes,
+The additional full regression checks all 23 real divider intervals (including
+two actual LEVEL23 terminal events without counter preloading), independent
+full-window references at LEVEL1/2/3/5, exhaustive bit order, random/boundary codes,
 both code formats, independent integer COUNT and sums, frame atomicity, recovery,
 and 3969 source-synchronous timing-model combinations. A reviewable artificial
 stimulus generator recreates byte-identical prior clean and combined-interference

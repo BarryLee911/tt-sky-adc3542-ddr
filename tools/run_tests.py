@@ -44,11 +44,22 @@ def prepare():
     cases.append(dict(name='faults',input=str(folder/'random.bin'),n=262144,faults=1))
     for c in cases:c['sha256']=sha(c['input'])
     save(OUT/'jobs.json',cases)
+    # Independent full-window regressions for decimated streams. No archived data.
+    p=folder/'levels_random.bin';a=array.array('H',(rng.randrange(16384) for _ in range(655360)))
+    if sys.byteorder!='little':a.byteswap()
+    p.write_bytes(a.tobytes())
+    save(OUT/'level_jobs.json',[
+        dict(name='level2_faults',exe='tb_stream_level2',n=655360,faults=1),
+        dict(name='level3_offset_faults',exe='tb_stream_level3',n=655360,faults=1),
+        dict(name='level5_window',exe='tb_stream_level5',n=655360,faults=0)])
     print('PREPARE_PASS',flush=True)
 def compile_all():
     integrity();records=[]
     common=[str(SRC/p) for p in ['adc3542_rx7.v','meanabs_candidate.v','project_adc3542_ddr.v']]
-    for top,opts in [('tb_rx',[]),('tb_config',[]),('tb_stream',[]),('tb_stream_short',['-Ptb_stream.HANDOFF=17']),('tb_stream_offset',['-Ptb_stream.TWOS=0'])]:
+    for top,opts in [('tb_rx',[]),('tb_config',[]),('tb_levels',[]),('tb_stream',[]),('tb_stream_short',['-Ptb_stream.HANDOFF=17']),('tb_stream_offset',['-Ptb_stream.TWOS=0']),
+                     ('tb_stream_level2',['-Ptb_stream.LEVEL=2']),
+                     ('tb_stream_level3',['-Ptb_stream.LEVEL=3','-Ptb_stream.TWOS=0']),
+                     ('tb_stream_level5',['-Ptb_stream.LEVEL=5'])]:
         actual='tb_stream' if top.startswith('tb_stream') else top
         cmd=[str(IVER),'-g2012','-Wall','-s',actual,*opts,'-o',str(HERE/f'{top}.vvp'),*common,str(OLD),str(HERE/f'{actual}.v')]
         p=subprocess.run(cmd,cwd=HERE,capture_output=True,text=True)
@@ -74,6 +85,10 @@ def run_all():
     c=cases[0];args=[f'+INPUT={Path(c["input"]).as_posix()}',f'+N={c["n"]}']
     records.append(run_one('early_handoff_faults','tb_stream_short',[*args,'+FAULTS=1'],'STREAM_PASS'))
     records.append(run_one('offset_binary','tb_stream_offset',args,'STREAM_PASS'))
+    for c in json.loads((OUT/'level_jobs.json').read_text(encoding='utf-8')):
+        args=[f'+INPUT={(OUT/"stimuli/levels_random.bin").as_posix()}',f'+N={c["n"]}',f'+FAULTS={c["faults"]}']
+        records.append(run_one(c['name'],c['exe'],args,'STREAM_PASS'))
+    records.append(run_one('all_level_real_intervals','tb_levels',[],'LEVELS_PASS'))
     total={k:sum(r['counts'].get(k,0) for r in records) for k in ['samples','accepted','count_checks','frames','invalids','updates_open','errors','resets']}
     streams=[r['counts'] for r in records if 'frames' in r['counts']]
     assert max(r['max_sum16'] for r in streams)==268435456

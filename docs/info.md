@@ -13,8 +13,10 @@ algorithm. Rectified magnitudes form a 25-bit period sum and 29-bit moving sum
 over 16 periods. Only that final sum is divided by four to retain the previous
 27-bit output format; individual input samples are never truncated to 12 bits.
 
-Only LEVEL=1 is supported. The target is 40.96MHz on clk and 20.48MS/s ADC
-sampling, requiring a shared, phase-controlled clock source. DCLK is sampled
+LEVEL1..23 are supported. For LEVEL=L, process every 2^(L-1)th complete ADC word,
+retaining the previous clk/2^L effective sample rate. The physical target remains
+40.96MHz on clk and 20.48MS/s ADC sampling in every mode, requiring a shared,
+phase-controlled clock source. DCLK is sampled
 as a marker, not used as a second ASIC clock. Frequency matching alone does
 not establish correct operation. Read [interface and timing](interface-and-timing.md)
 before connecting hardware.
@@ -22,7 +24,9 @@ before connecting hardware.
 ## How to test
 
 After ADC initialization and stable clocks, hold rst_n low for at least four
-clk edges, then present LEVEL=1 on uio[4:0]. Other LEVELs do not start the chip.
+clk edges, then present LEVEL=1..23 on uio[4:0]. LEVEL0 and LEVEL24..31 do not
+start the chip. The first legal LEVEL is latched until global reset; subsequent
+pad changes cannot change it. See [multi-level behavior](multilevel.md).
 Release the controller's uio[0] driver before the 80000-clk handoff (1.953125ms
 at the target clock). uio[4:1] remain inputs and are unused after configuration.
 
@@ -39,7 +43,9 @@ TYPE alternates every clk after handoff. TYPE=0 gives the 11-bit overlap count
 
 Repeated DCLK markers discard the affected pair, clear both measurement windows,
 and restart alignment. After an error, ignore COUNT until a fresh 0/1/2 frame
-arrives after 32768 continuous complete samples. The protocol has no sequence
+arrives after 32768 newly selected samples, i.e. 32768*2^(LEVEL-1) continuous
+complete ADC words. Error detection includes words omitted by decimation.
+The protocol has no sequence
 number or CRC: loss of a complete pair, paired repetition, and data corruption
 can be undetectable. Repeated output frames are not independent measurements.
 
@@ -47,7 +53,8 @@ For an ideal sine, amplitude in the previous 8-bit code units is
 S27*pi/1048576. This output granularity is not ADC ENOB or impedance resolution.
 The official RTL and gate-level jobs share a black-box pin test. A separate
 ddr-regression job exhaustively checks reconstruction, independent integer
-COUNT/sums, reset recovery, two code formats, frame atomicity, and 3969 declared
+COUNT/sums, all 23 real divider intervals, selected-sample window and reset
+recovery at LEVEL1/2/3/5, two code formats, frame atomicity, and 3969 declared
 source-synchronous timing scenarios. Gate-level functional tests use a slow
 clock to settle unit-delay models; they do not demonstrate high-speed operation.
 

@@ -65,16 +65,19 @@ async def test_project(dut):
             if frame_expected is not None:
                 assert snapshot==frame_expected,('27-bit amplitude',snapshot,frame_expected)
 
-    async def stream(value,n):
+    async def stream(value,n,level=1):
         raw=value^8192 # ADC default two's complement; input normalized once in ASIC
         expected=(abs(value-8192)*32768)>>2
         for i in range(n):
-            stable=expected if i>=35000 else None
+            stable=expected if i>=35000*(1<<(level-1)) else None
             await tick(128|(raw&127),expected=stable)
             await tick(raw>>7,expected=stable)
 
     for _ in range(5):await tick(0,reset=True)
     for _ in range(5):await tick(0) # illegal LEVEL=31 must not start handoff
+    assert int(dut.uio_oe.value)==0xe0
+    dut.uio_in.value=0
+    for _ in range(5):await tick(0) # LEVEL0 exceeds this interface's word rate
     assert int(dut.uio_oe.value)==0xe0
     dut.uio_in.value=1
     await tick(0) # configuration capture
@@ -101,4 +104,21 @@ async def test_project(dut):
     await tick(64) # upper without a lower cannot resurrect the interrupted pair
     for _ in range(8):await tick(128);await tick(64)
     assert int(dut.uio_oe.value)==0xe0
-    dut._log.info('PIN_AND_GATE_PASS frames=%d invalids=%d count_checks=%d',frames,invalids,count_checks)
+    # Reset selects a different LEVEL. The same exact pin-only checks run on
+    # both RTL and the physically generated gate-level netlist.
+    for _ in range(4):await tick(0,reset=True)
+    dut.uio_in.value=2
+    await tick(0)
+    dut.uio_in.value=31 # subsequent pin changes must not overwrite the latch
+    before_frames=frames
+    await stream(0,74000,level=2)
+    assert frames>before_frames+100,'LEVEL2 did not fill its 16-period window'
+    for _ in range(4):await tick(0,reset=True)
+    dut.uio_in.value=5
+    await tick(0)
+    dut.uio_in.value=31
+    await stream(0,4096,level=5)
+    word=(int(dut.uio_out.value)>>5)*256+int(dut.uo_out.value)
+    assert word==255,('LEVEL5 selected-sample COUNT before handoff',word)
+    assert int(dut.uio_oe.value)==0xe0
+    dut._log.info('PIN_AND_GATE_PASS levels=1,2,5 frames=%d invalids=%d count_checks=%d',frames,invalids,count_checks)

@@ -1,4 +1,4 @@
-// Derived from the preserved project_12bit.v. LEVEL=1 only.
+// Derived from the preserved project_12bit.v. LEVEL=1..23.
 // Existing output pads, alternating TYPE, 80000-clock handoff, 3x9-bit frames.
 `default_nettype none
 module tt_um_sine_area_detector_adc3542_ddr #(
@@ -13,11 +13,23 @@ module tt_um_sine_area_detector_adc3542_ddr #(
 );
     wire _unused = &{ena,uio_in[7:5],1'b0};
     reg config_latched_valid;
+    reg [4:0] config_level_latched;
+    reg [21:0] decimation_terminal;
     always @(posedge clk) begin
-        if (!rst_n) config_latched_valid <= 0;
-        else if (uio_in[4:0] == 5'd1) config_latched_valid <= 1;
+        if (!rst_n) begin
+            config_latched_valid <= 0;
+            config_level_latched <= 0;
+            decimation_terminal <= 0;
+        end else if (!config_latched_valid &&
+                     uio_in[4:0] >= 5'd1 && uio_in[4:0] <= 5'd23) begin
+            config_latched_valid <= 1;
+            config_level_latched <= uio_in[4:0];
+            // One complete word every two clk edges. Select each 2^(LEVEL-1)th
+            // complete word; never prescale the half-word receiver itself.
+            decimation_terminal <= (22'd1 << (uio_in[4:0] - 5'd1)) - 22'd1;
+        end
     end
-    // Other LEVELs cannot select a mismatched sample rate. No second divide-by-2.
+    // LEVEL=0 cannot deliver a complete 14-bit word per clk on this interface.
     wire receiver_rst_n = rst_n && config_latched_valid;
     wire [13:0] sample14;
     wire sample_valid, rx_error, rx_locked;
@@ -29,7 +41,16 @@ module tt_um_sine_area_detector_adc3542_ddr #(
     // An error clears both measurement windows at the next clk edge. Receiver
     // stays active to reacquire. No stale window survives a detected discontinuity.
     wire measurement_rst_n = receiver_rst_n && !rx_error;
-    wire backend_process = sample_valid && measurement_rst_n && rx_locked;
+    reg [21:0] decimation_count;
+    wire complete_sample = sample_valid && measurement_rst_n && rx_locked;
+    wire backend_process = complete_sample && (decimation_count == decimation_terminal);
+    always @(posedge clk) begin
+        if (!measurement_rst_n) decimation_count <= 0;
+        else if (complete_sample) begin
+            if (backend_process) decimation_count <= 0;
+            else decimation_count <= decimation_count + 22'd1;
+        end
+    end
     reg [2047:0] overlap_history;
     reg [10:0] history_pointer;
     reg [11:0] running_sum;
