@@ -1,0 +1,71 @@
+name: viewer-80mhz
+on: [push, workflow_dispatch]
+permissions:
+  contents: read
+  actions: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages-versioned-viewer
+  cancel-in-progress: false
+jobs:
+  viewer:
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download exact 80MHz submission
+        uses: actions/download-artifact@v7
+        with:
+          name: tt_submission
+          run-id: 39857447569
+          github-token: ${{ github.token }}
+          path: current
+      - name: Download preserved original submission
+        uses: actions/download-artifact@v7
+        with:
+          name: tt_submission
+          run-id: 39845775719
+          github-token: ${{ github.token }}
+          path: legacy
+      - name: Download 80MHz preview
+        uses: actions/download-artifact@v7
+        with:
+          name: gds_render
+          run-id: 39857447569
+          github-token: ${{ github.token }}
+          path: site/adc3543-80mhz
+      - name: Preserve original preview
+        uses: actions/download-artifact@v7
+        with:
+          name: gds_render
+          run-id: 39845775719
+          github-token: ${{ github.token }}
+          path: site
+      - name: Verify source revisions and prepare versioned official viewer models
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 prepare_viewer.py
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+      - name: Deploy versioned viewers
+        id: deployment
+        uses: actions/deploy-pages@v5
+      - name: Publish viewer links
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from urllib.parse import quote
+          base=os.environ['PAGE_URL'].rstrip('/')
+          model=base+'/adc3543-80mhz/tinytapeout.oas'
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+              f.write('## ADC3543 80MHz viewer\n\n')
+              f.write('[Open 3D viewer](https://gds-viewer.tinytapeout.com/?pdk=sky130A&model='+quote(model,safe='')+')\n\n')
+              f.write('[Version status]('+base+'/adc3543-80mhz/status.html) · [Preserved original viewer]('+base+'/)\n\n')
+              f.write('This is the layout from commit 19251b9. Worst SS setup slack is -2.187ns; all-corner 80MHz timing is not closed.\n')
+          PY
