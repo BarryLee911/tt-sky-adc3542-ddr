@@ -10,12 +10,12 @@ module tb_levels;
  tt_um_sine_area_detector_adc3542_ddr #(.HANDOFF_WAIT_CYCLES(8)) dut(ui,outp,uio,iop,oep,1'b1,clk,rst_n);
  task tick(input integer bus,valid,process_sample,resetting);
  begin
-   clk=0;ui=bus;rst_n=!resetting;#5;
+   clk=0;ui=bus;rst_n=!resetting;#6.25;
    if(!resetting && dut.backend_process!==process_sample[0])
      $fatal(1,"Selection cadence level=%0d raw_word=%0d",level,n);
    if(resetting)selected=0;
    else if(process_sample)selected=selected+1;
-   clk=1;#5;
+   clk=1;#6.25;
    if(dut.sample_valid!==valid[0] || dut.rx_error!==0)
      $fatal(1,"DDR receiver must run at every LEVEL level=%0d raw_word=%0d",level,n);
    if(valid && dut.sample14!==14'd0)$fatal(1,"Full-word recovery level=%0d",level);

@@ -1,15 +1,17 @@
 # SPDX-License-Identifier: Apache-2.0
 """Black-box pin regression shared by the official RTL and gate-level jobs.
 
-A slow functional clock leaves time for unit-delay gate models to settle.
-It does NOT demonstrate 40.96MHz pad/board or SDF timing closure.
+The RTL harness uses 80MHz; gate-level unit-delay models use a slow clock.
+Neither demonstrates pad/board or SDF timing closure.
 The separate ddr-regression workflow exhaustively checks sample transport.
 """
+import os
 import cocotb
 from cocotb.triggers import Timer
 
 @cocotb.test()
 async def test_project(dut):
+    half_period_ns=float(os.environ.get("TEST_CORE_PERIOD_NS", "12.5"))/2
     dut.ena.value=1
     dut.clk.value=0
     dut.rst_n.value=0
@@ -28,9 +30,9 @@ async def test_project(dut):
         dut.clk.value=0
         dut.ui_in.value=bus
         dut.rst_n.value=0 if reset else 1
-        await Timer(500,unit='ns')
+        await Timer(half_period_ns,unit='ns')
         dut.clk.value=1
-        await Timer(500,unit='ns')
+        await Timer(half_period_ns,unit='ns')
         oe=int(dut.uio_oe.value)
         io=int(dut.uio_out.value)
         word=(io>>5)*256+int(dut.uo_out.value)

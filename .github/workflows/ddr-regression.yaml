@@ -23,7 +23,7 @@ jobs:
         run: python tools/run_tests.py run
       - name: Compile phase model
         run: python tools/timing_sweep.py compile
-      - name: Sweep source-synchronous phase and declared timing corners
+      - name: Evaluate 80MHz phase envelope and report the unclosed aperture
         run: python tools/timing_sweep.py run
       - name: Verify host protocol and preserved source hashes
         run: |

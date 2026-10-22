@@ -1,4 +1,8 @@
-"""Explicit assumed envelopes. These are not translator/PVT timing specifications."""
+"""80MHz retained absolute delay envelopes; expected absence of a robust aperture.
+
+Success of this analysis script means the model was reproduced, not board signoff.
+The original ns delays and guards are NOT scaled down with the clock period.
+"""
 from run_tests import *
 import concurrent.futures, csv, itertools
 def compile_timing():
@@ -10,7 +14,7 @@ def compile_timing():
 def sweep():
     # ADC tPD corners, aggregate data-DCLK skew, assumed output duty distortion.
     # Direct: no extra delay. Illustrative translation: total added common delay 3..5ns.
-    phases=[i*.5 for i in range(49)]
+    phases=[i*.5 for i in range(25)]
     scenarios=[(env,phase,tpd,extra,skew,duty) for env,extras in [('direct',[0]),('illustrative_translation',[3,5])]
                for phase,tpd,extra,skew,duty in itertools.product(phases,[3,5,7],extras,[-1,0,1],[-2,0,2])]
     def one(s):
@@ -20,29 +24,32 @@ def sweep():
         assert p.returncode==0 and 'TIMING_RESULT' in p.stdout,p.stdout+p.stderr
         values={k:float(v) for k,v in re.findall(r'([a-z_]+)=(-?[\d.]+)',p.stdout)}
         return dict(envelope=env,phase_ns=phase,tpd_ns=tpd,extra_ns=extra,skew_ns=skew,duty_ns=duty,**values,
-            passed=values['bad']==0 and values['aperture']==0 and values['checks']>=120)
+            passed=values['bad']==0 and values['aperture']==0 and values['checks']>=120,
+            remaining_guard_margin_ns=min(values['setup_ns']-1.5,values['hold_ns']-1.0))
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         rows=list(pool.map(one,scenarios))
     with (OUT/'timing_sweep.csv').open('w',newline='',encoding='utf-8') as f:
         w=csv.DictWriter(f,fieldnames=list(rows[0]));w.writeheader();w.writerows(rows)
     summary={}
-    for env in ['direct','illustrative_translation']:
+    for env,limits in [('direct',[11.5,11.5]),('illustrative_translation',[16.5,14.5])]:
         good=[p for p in phases if all(r['passed'] for r in rows if r['envelope']==env and r['phase_ns']==p)]
-        assert good
-        groups=[]
-        for p in good:
-            if not groups or p>groups[-1][1]+.5:groups.append([p,p])
-            else:groups[-1][1]=p
-        summary[env]=dict(all_corner_good_phases_ns=good,grid_intervals_ns=groups,
+        robust=[p for p in good if min(r['remaining_guard_margin_ns'] for r in rows if r['envelope']==env and r['phase_ns']==p)>0]
+        summary[env]=dict(all_corner_good_grid_phases_ns=good,positive_margin_grid_phases_ns=robust,
             scenarios=sum(r['envelope']==env for r in rows),
-            analytic_unwrapped_open_interval_ns=[11.5,23.4140625] if env=='direct' else [16.5,26.4140625],
+            analytic_strict_phase_bounds_ns=limits,strict_window_width_ns=limits[1]-limits[0],
             analytic_explanation='latest launch+skew+setup+uncertainty < phase < H+earliest next launch+skew-duty-hold-uncertainty')
-    # Since phase is modulo H, only tested phase 0..24ns is reported, not an extrapolated eye.
-    save(OUT/'timing_validation.json',dict(status='BEHAVIOURAL_MODEL_ONLY',clock_period_ns=24.4140625,
-      adc_period_ns=48.828125,scenarios=len(rows),setup_ns=1,hold_ns=.5,uncertainty_ns=.5,
+    # Reproduce the approved 80MHz handoff, including the zero-margin boundary.
+    # A >=0 guard check at PHI=11.5 is NOT a usable positive-width phase interval.
+    assert len(rows)==2025
+    assert summary['direct']['all_corner_good_grid_phases_ns']==[11.5]
+    assert summary['illustrative_translation']['all_corner_good_grid_phases_ns']==[]
+    assert all(not s['positive_margin_grid_phases_ns'] for s in summary.values())
+    save(OUT/'timing_validation.json',dict(status='NO_POSITIVE_COMMON_MARGIN_UNDER_PREVIOUS_ASSUMPTIONS',clock_period_ns=12.5,
+      adc_period_ns=25,scenarios=len(rows),setup_ns=1,hold_ns=.5,uncertainty_ns=.5,
       assumed_skew_ns=[-1,1],assumed_output_duty_distortion_ns=[-2,2],summary=summary,
-      limits='No library, PCB, translator PVT, input slew, CTS, metastability or measured duty guarantee. Not physical timing closure.'))
-    print('TIMING_SWEEP_DONE',len(rows),summary,flush=True)
+      limits='Retained illustrative envelope; no measured library/PCB/translator PVT, input slew, CTS, metastability or duty guarantee. Not an ADC3543 speed-limit result or physical timing closure.',
+      action='Retain 80/40MHz target; obtain actual ADC3543/translator/board/ASIC corner bounds and common clock phase before interface signoff.'))
+    print('TIMING_MODEL_REPRODUCED_NO_POSITIVE_MARGIN',len(rows),summary,flush=True)
 if __name__=='__main__':
     ap=argparse.ArgumentParser();ap.add_argument('action',choices=['compile','run']);a=ap.parse_args()
     (compile_timing if a.action=='compile' else sweep)()

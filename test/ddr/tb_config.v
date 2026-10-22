@@ -5,7 +5,7 @@ module tb_config;
  wire [7:0] outp,iop,oep;
  integer i,j,level,checks=0;
  tt_um_sine_area_detector_adc3542_ddr #(.HANDOFF_WAIT_CYCLES(8)) dut(ui,outp,uio,iop,oep,1'b1,clk,rst_n);
- always #12.207 clk=~clk;
+ always #6.25 clk=~clk;
  task reset;
  begin
    @(negedge clk);rst_n=0;uio=31;

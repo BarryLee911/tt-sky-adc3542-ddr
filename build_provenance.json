@@ -6,9 +6,9 @@
     "adc3542_rx7.v": "20d7ac2265bb31bb6979972b35995faf0ac55567b2b24545d4aa160e0e36e14d",
     "meanabs_candidate.v": "41db477363224763b4ed180d3de584f9fff50554051286889c100f782c0ad21f"
   },
-  "clock_target_hz": 40960000,
+  "clock_target_hz": 80000000,
   "tiles": "6x2",
-  "physical_interface_signoff": "Not established; default TT I/O constraints are not the external DDR board budget",
+  "physical_interface_signoff": "Not established: the retained absolute delay assumptions have no positive common aperture at 80MHz",
   "base_ddr_version": {
     "commit": "11c630ee90fc27b1330f48f587303fb95fbd12d5",
     "project_adc3542_ddr.v": "6311b2a7e2549ce5355c334f1a6534af17eeddf426625637fa1125ddbf2f8619"
@@ -52,5 +52,9 @@
     30,
     31
   ],
-  "selection": "Each 2^(LEVEL-1)th complete word, first raw zero-based index 2^(LEVEL-1)-1"
+  "selection": "Each 2^(LEVEL-1)th complete word, first raw zero-based index 2^(LEVEL-1)-1",
+  "multilevel_base_commit": "51f1efa3ad4131b0efbdf73c9521231f7d528903",
+  "selected_adc": "ADC3543",
+  "adc_samples_per_second": 40000000,
+  "production_datapath_changed_from_multilevel_base": false
 }

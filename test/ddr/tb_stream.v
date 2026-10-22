@@ -19,7 +19,7 @@ module tb_stream;
  .ui_in(ui),.uo_out(outp),.uio_in(inp),.uio_out(iop),.uio_oe(oep),.ena(1'b1),.clk(clk),.rst_n(rst_n));
  tt_um_sine_area_detector_12bit #(.HANDOFF_WAIT_CYCLES(HANDOFF)) old(
  .ui_in(ui),.uo_out(oldout),.uio_in(inp),.uio_out(oldio),.uio_oe(oldoe),.ena(1'b1),.clk(clk),.rst_n(rst_n));
- always #12.207 clk=~clk;
+ always #6.25 clk=~clk;
  reg [7:0] bytes[0:4194303];
  integer ev=0,ee=0,eq=8192,pv=0,pe=0,pq=8192,configured=0;
  wire ref_reset = rst_n && configured && !pe;
@@ -175,5 +175,5 @@ module tb_stream;
    $display("STREAM_PASS,level=%0d,edges=%0d,accepted=%0d,count_checks=%0d,frames=%0d,invalids=%0d,updates_open=%0d,errors=%0d,resets=%0d,max_sum16=%0d,remainder_mask=%0d",LEVEL,edges,accepted,count_checks,frames,invalids,updates_open,error_count,resets,max_sum16,remainder_mask);
    $finish;
  end
- initial begin #150000000;$fatal(1,"Stream timeout");end
+ initial begin #75000000;$fatal(1,"Stream timeout");end
 endmodule

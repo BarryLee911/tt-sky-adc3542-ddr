@@ -94,7 +94,7 @@ def run_all():
     assert max(r['max_sum16'] for r in streams)==268435456
     assert any(r['updates_open']>0 for r in streams)
     assert any(r['remainder_mask']==15 for r in streams)
-    save(OUT/'functional_validation.json',dict(status='PASS',runs=records,total=total,protected=integrity(),scope='Functional RTL only; no physical timing/ENOB/performance guarantee'))
+    save(OUT/'functional_validation.json',dict(status='PASS',master_clock_hz=80000000,adc_samples_per_second=40000000,runs=records,total=total,protected=integrity(),scope='80MHz RTL source schedule; no physical timing/ENOB/performance guarantee'))
 if __name__=='__main__':
     ap=argparse.ArgumentParser();ap.add_argument('action',choices=['prepare','compile','run','integrity']);a=ap.parse_args()
     {'prepare':prepare,'compile':compile_all,'run':run_all,'integrity':integrity}[a.action]()
